@@ -1,0 +1,22 @@
+{
+  "name": "flashgbx-pocket",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "dev": "node server.mjs",
+    "test": "node --test test/*.test.js",
+    "check": "node --check dist/app.js && node --check dist/lib/transport.js && node --check dist/lib/lk.js && node --check dist/lib/cartridge.js",
+    "cf:dev": "wrangler dev --ip 127.0.0.1 --port 8787",
+    "cf:whoami": "wrangler whoami",
+    "deploy:check": "wrangler deploy --dry-run --outdir .wrangler/deploy",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.152.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

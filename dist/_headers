@@ -1,0 +1,4 @@
+/*
+  Permissions-Policy: usb=(self), serial=(self)
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer

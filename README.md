@@ -15,13 +15,13 @@ Cliente web independiente del protocolo FlashGBX LK L15. La interfaz está en es
 
 | Función | Alcance |
 | --- | --- |
-| Identificación | Firma L, versión exacta 15, nombre de lector y capacidades; requiere control de alimentación |
+| Identificación | Firma L, versión exacta 15, nombre de lector y capacidades; admite revisiones con y sin control de alimentación |
 | ROM GB/GBC | ROM sin mapper, MBC1 estándar, MBC2, MBC3 y MBC5; revisión de cabecera |
 | ROM GBA | Cartuchos lineales de 1, 2, 4, 8, 16 y 32 MiB; tamaño elegido manualmente |
 | Verificación de ROM | Segunda lectura opcional; activada por defecto; SHA-256 del archivo |
 | Partidas GB/GBC | Lectura SRAM o MBC2 con segunda lectura obligatoria |
 | Restauración GB/GBC | Archivo del tamaño exacto, respaldo previo descargable y confirmación; lectura posterior y comparación byte por byte |
-| Alimentación | 5 V GB/GBC, 3,3 V GBA; apagado entre operaciones; autoapagado del firmware configurado a 5 segundos |
+| Alimentación | 5 V GB/GBC, 3,3 V GBA; apagado entre operaciones y autoapagado a 5 segundos cuando la placa lo permite; en otras revisiones se dejan las líneas de dirección como entradas y el cartucho sigue alimentado |
 | Errores | Timeout, transferencia incompleta, ACK inválido y desconexión invalidan la sesión; no se reintentan escrituras automáticamente |
 | Demostración | Datos ficticios, sin conexión al hardware; descargas marcadas DEMO |
 
@@ -35,7 +35,7 @@ Los archivos MBC2 tienen 512 bytes con el nibble alto normalizado a `F`. Un `.sa
 2. Inserta el cartucho con el lector desconectado.
 3. Abre la URL HTTPS de la aplicación directamente en Chrome. Si el alojamiento es privado, inicia sesión con la cuenta propietaria.
 4. Conecta el lector mediante OTG y toca **Conectar por USB**. El perfil predeterminado es GBFlash a 2 Mbaud.
-5. Selecciona GB/GBC o GBA. La selección controla el voltaje, así que debe coincidir con el cartucho.
+5. Selecciona GB/GBC o GBA. La selección controla el voltaje, así que debe coincidir con el cartucho. Las revisiones sin control de alimentación muestran un aviso permanente: desconecta físicamente el USB antes de retirar o cambiar el cartucho; cerrar la conexión desde la app no corta la alimentación.
 6. Toca **Identificar cartucho**, realiza el respaldo y toca **Descargar** para conservar el archivo.
 7. Para restaurar una partida GB/GBC, selecciona un `.sav`. La app requiere leer y descargar un respaldo previo antes de habilitar la escritura. Conserva Chrome en primer plano y el cable conectado hasta terminar.
 8. Desconecta el lector antes de retirar o cambiar el cartucho.
@@ -98,7 +98,7 @@ La metadata anterior en `.openai/hosting.json` pertenece al borrador sin publica
 
 ## Validación y límites
 
-Las pruebas automatizadas cubren fragmentación de respuestas, bytes sobrantes, timeout, lectores concurrentes, configuración CH340, endpoints USB dinámicos, escrituras USB parciales, identificación L15, bancos MBC1 0x20/0x40/0x60, noveno bit de MBC5, SRAM de varios bancos, MBC2, cambio de cartucho, archivo incorrecto, corrupción en la escritura, dirección GBA en palabras, voltaje GBA, cancelación y ACK inválido. La demo permite comprobar el flujo visual y las descargas sin tocar hardware.
+Las pruebas automatizadas cubren revisiones L15 sin control de alimentación (identificación, ROM, SRAM, cancelación y reposo), fragmentación de respuestas, bytes sobrantes, timeout, lectores concurrentes, configuración CH340, endpoints USB dinámicos, escrituras USB parciales, identificación L15, bancos MBC1 0x20/0x40/0x60, noveno bit de MBC5, SRAM de varios bancos, MBC2, cambio de cartucho, archivo incorrecto, corrupción en la escritura, dirección GBA en palabras, voltaje GBA, cancelación y ACK inválido. La demo permite comprobar el flujo visual y las descargas sin tocar hardware.
 
 **Pendiente: pruebas físicas Android + GBFlash.** Antes de considerar este cliente equivalente a FlashGBX de escritorio, comprobar en hardware:
 

@@ -34,6 +34,7 @@ function updateControls() {
   $('connection-badge').classList.toggle('connected', connected && !demo);
   $('device-led').classList.toggle('on', connected && !demo);
   $('demo-banner').hidden = !demo;
+  $('power-notice').hidden = demo || !service || lk?.info?.powerControl !== false;
   $('cart-empty').hidden = !!cart; $('cart-info').hidden = !cart;
   $('gba-size-field').hidden = $('console').value !== 'AGB';
   $('mode-hint').textContent = $('console').value === 'AGB' ? 'GBA usa 3,3 V. El tamaño se selecciona manualmente; las partidas GBA aún no están soportadas.' : 'Selecciona la consola antes de alimentar el cartucho.';
@@ -45,7 +46,7 @@ function showCart() {
     $('cart-rom').textContent = sizeLabel(cart.romSize);
     $('cart-save').textContent = cart.mode === 'AGB' ? 'No soportada' : cart.ramSize ? sizeLabel(cart.ramSize) : 'Sin RAM';
     $('cart-mapper').textContent = cart.mapper || 'No soportado';
-    $('cart-note').textContent = cart.unsupported || (demo ? 'Cartucho ficticio. Los archivos de demostración no contienen un juego.' : cart.rtc ? 'El respaldo .sav contiene la partida; no incluye el reloj RTC.' : cart.mode === 'AGB' ? 'ROM lineal. Confirma el tamaño elegido antes de respaldar.' : 'Cartucho identificado. El lector queda apagado entre operaciones.');
+    $('cart-note').textContent = cart.unsupported || (demo ? 'Cartucho ficticio. Los archivos de demostración no contienen un juego.' : cart.rtc ? 'El respaldo .sav contiene la partida; no incluye el reloj RTC.' : cart.mode === 'AGB' ? 'ROM lineal. Confirma el tamaño elegido antes de respaldar.' : lk?.info?.powerControl ? 'Cartucho identificado. El lector queda apagado entre operaciones.' : 'Cartucho identificado. Desconecta el cable USB antes de retirar o cambiar el cartucho.');
   }
   updateControls();
 }
@@ -113,7 +114,7 @@ $('connect').addEventListener('click', () => run(service ? 'Desconectando' : 'Co
     const info = await lk.identify(); service = new CartridgeService(lk);
     $('device-name').textContent = info.name;
     $('device-detail').textContent = `L${info.version} · PCB ${info.pcb} · ${transport.label}`;
-    log(`Identificado ${info.name}, firmware L${info.version}, PCB ${info.pcb}, ${$('reader-model').value} baud.`);
+    log(`Identificado ${info.name}, firmware L${info.version}, PCB ${info.pcb}, ${$('reader-model').value} baud. Control de alimentación: ${info.powerControl ? 'sí' : 'no'}. Flags: 0x${info.flags.toString(16)}.`);
     message('Lector conectado. Elige la consola e identifica el cartucho.');
   } catch (error) { await disconnect(); throw error; }
 }));

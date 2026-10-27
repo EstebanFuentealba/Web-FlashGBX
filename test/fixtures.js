@@ -23,9 +23,10 @@ export function gbaROM() {
 // Independent byte-level firmware simulator. It models bank registers, SRAM access,
 // ACKs, word addressing and response fragmentation, without a browser or hardware.
 export class FirmwareSimulator {
-  constructor(rom = gbROM(), mapper = 'MBC1', ramSize = 32768) {
+  constructor(rom = gbROM(), mapper = 'MBC1', ramSize = 32768, flags = 1) {
     this.rom = rom; this.mapper = mapper; this.ram = new Uint8Array(ramSize).map((_,i) => (i * 7) & 255);
-    this.queue = new ByteQueue(); this.commands = []; this.closed = false; this.power = false; this.reset();
+    this.flags = flags; this.powerControl = !!(flags & 1); this.addressInputs = false;
+    this.queue = new ByteQueue(); this.commands = []; this.closed = false; this.power = !this.powerControl; this.reset();
   }
   reset() { this.v8 = {}; this.v16 = {}; this.v32 = {}; this.low = 1; this.high = 0; this.ramBank = 0; this.bankMode = 0; this.ramEnabled = false; }
   push(bytes) { const data = Uint8Array.from(bytes); for (let i = 0; i < data.length; i += 23) this.queue.push(data.subarray(i, i + 23)); }
@@ -35,15 +36,17 @@ export class FirmwareSimulator {
     if (this.closed) throw new Error('closed');
     this.commands.push(Array.from(bytes));
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength), cmd = bytes[0];
+    if (!this.powerControl && ([0xf2,0xf3].includes(cmd) || (cmd === 0xa6 && ((bytes[1] === 4 && view.getUint32(2) === 1) || (bytes[1] === 1 && view.getUint32(2) === 0x0f))))) throw new Error('unsupported power command');
     if (cmd === 0xa1) {
       const name = new TextEncoder().encode('GBFlash\0');
-      this.push([8,0x4c,0,15,13,0,0,0,1,name.length,...name,1,0]); return;
+      this.push([8,0x4c,0,15,13,0,0,0,1,name.length,...name,this.flags,0]); return;
     }
     if (cmd === 0xa6) {
       const vars = { 1: this.v8, 2: this.v16, 4: this.v32 }[bytes[1]];
       vars[view.getUint32(2)] = view.getUint32(6); this.push([1]); return;
     }
-    if ([0xa2,0xa3].includes(cmd)) { this.reset(); this.mode = cmd === 0xa2 ? 'AGB' : 'DMG'; }
+    if ([0xa2,0xa3].includes(cmd)) { if (this.powerControl) this.reset(); this.addressInputs = false; this.mode = cmd === 0xa2 ? 'AGB' : 'DMG'; }
+    if (cmd === 0xa8) this.addressInputs = true;
     if (cmd === 0xf2) this.power = true;
     if (cmd === 0xf3) this.power = false;
     if (cmd === 0xb2) {
@@ -59,7 +62,7 @@ export class FirmwareSimulator {
     }
     if ([0xb1,0xc1,0xc3].includes(cmd)) {
       const length = this.v16[0], address = this.v32[0];
-      if (!this.power) throw new Error('read without power');
+      if (!this.power || this.addressInputs) throw new Error('read without active bus');
       if (cmd === 0xc1) { this.push(this.rom.subarray(address * 2, address * 2 + length)); return; }
       if (this.v8[8] && this.mode === 'DMG') {
         if (!this.ramEnabled && this.mapper !== 'ROM') throw new Error('RAM not enabled');

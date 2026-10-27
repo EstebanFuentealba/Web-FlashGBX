@@ -51,6 +51,40 @@ test('L15 identify parses capability bitfields, without powering the cartridge',
   const {wire,lk} = await setup(); assert.equal(lk.info.name,'GBFlash'); assert.equal(lk.info.version,15);
   assert.equal(wire.power,false); assert.deepEqual(wire.commands[0],[0xa1]);
 });
+test('L15 without power control supports repeated GB ROM and SRAM operations', async () => {
+  const rom = gbROM(), wire = new FirmwareSimulator(rom, 'MBC1', 32768, 0x06), lk = new LKDevice(wire);
+  const info = await lk.identify(), service = new CartridgeService(lk);
+  assert.equal(info.powerControl, false); assert.equal(info.flags, 6);
+  assert.deepEqual(wire.commands, [[0xa1], [0xa8]]);
+  const cart = await service.inspect('DMG');
+  const original = await service.backupSave(cart);
+  await service.restoreSave(cart, original.map(n => n ^ 0x5a));
+  assert.deepEqual(await service.backupSave(cart), wire.ram);
+  assert.deepEqual(await service.backupROM(cart), rom);
+  assert.equal((await service.inspect('DMG')).title, cart.title);
+  assert.ok(wire.commands.some(c => sameBytes(c, [0xf5,0x40,0,0,0,1])));
+  assert.equal(wire.power, true); assert.equal(wire.addressInputs, true);
+  assert.ok(!wire.commands.some(c => [0xf2,0xf3].includes(c[0])));
+});
+test('L15 without power control idles after cancellation and operation errors', async () => {
+  const wire = new FirmwareSimulator(undefined, 'MBC1', 32768, 0), lk = new LKDevice(wire);
+  await lk.identify(); const service = new CartridgeService(lk), cart = await service.inspect('DMG');
+  const abort = new AbortController();
+  await assert.rejects(service.backupROM(cart, {signal:abort.signal,onProgress:p => { if (p > 0.38) abort.abort(); }}), /cancelada/);
+  assert.equal(wire.high, 0); assert.equal(wire.addressInputs, true);
+  assert.equal((await service.inspect('DMG')).title, cart.title);
+  await assert.rejects(lk.powered('DMG', async () => { throw new Error('test failure'); }), /test failure/);
+  assert.equal(wire.addressInputs, true); assert.equal(lk.busy, false);
+});
+test('L15 without power control selects GBA voltage and audio pin without power commands', async () => {
+  const rom = gbaROM(), wire = new FirmwareSimulator(rom, 'ROM', 0, 0), lk = new LKDevice(wire);
+  await lk.identify(); const service = new CartridgeService(lk), cart = await service.inspect('AGB', rom.length);
+  assert.deepEqual(await service.backupROM(cart, {verify:false}), rom);
+  assert.ok(wire.commands.some(c => sameBytes(c, [0xf5,0x40,0,0,0,0])));
+  assert.ok(wire.commands.some(c => c[0] === 0xa4));
+  assert.ok(!wire.commands.some(c => [0xa5,0xf2,0xf3].includes(c[0])));
+  assert.equal(wire.power, true); assert.equal(wire.addressInputs, true);
+});
 test('MBC1 backup includes otherwise inaccessible banks 00,20,40,60 and verifies a second pass', async () => {
   const rom = gbROM(3,6,3), {service,wire} = await setup(rom,'MBC1',32768);
   const cart = await service.inspect('DMG'); assert.equal(cart.unsupported,'');

@@ -35,17 +35,21 @@ export class LKDevice {
     const name = new TextDecoder().decode(await this.read(nameSize)).replace(/\0/g, '');
     const flags = await this.read(2);
     if (!['GBFlash', 'GBxCart RW'].includes(name)) return this.invalid(`El lector ${name} todavía no está soportado.`);
-    if (!(flags[0] & 1)) return this.invalid('Esta revisión no permite controlar la alimentación del cartucho y aún no está soportada.');
-    this.info = { name, version, pcb: bytes[3], build: view.getUint32(4, false), powerControl: true, flags: flags[0] };
-    await this.ack([0xf3]);
+    this.info = { name, version, pcb: bytes[3], build: view.getUint32(4, false), powerControl: !!(flags[0] & 1), flags: flags[0] };
+    await this.idle();
     return this.info;
+  }
+  async idle() {
+    // LK_Device.CartPowerOff uses high-impedance address lines on boards
+    // without a power switch. The cartridge remains physically powered.
+    await this.ack([this.info.powerControl ? 0xf3 : 0xa8]);
   }
   async powered(mode, task) {
     if (this.busy) throw new Error('Ya hay una operación en curso.');
     if (!this.info || !['DMG', 'AGB'].includes(mode)) throw new Error('Lector o modo inválido.');
     this.busy = true;
     try {
-      await this.ack([0xf3]);
+      await this.idle();
       await this.ack([mode === 'AGB' ? 0xa2 : 0xa3]);
       await this.ack([mode === 'AGB' ? 0xa4 : 0xa5]);
       this.mode = mode;
@@ -53,14 +57,19 @@ export class LKDevice {
       await this.variable(1, 0x09, 0);
       await this.variable(1, mode === 'AGB' ? 0x0c : 0x0b, 0); // conservative read method
       if (mode === 'AGB') await this.variable(1, 0x10, 0);
-      await this.variable(4, 1, 5000); // firmware timeout if the tab disappears
-      await this.variable(1, 0x0f, 1);
-      await this.ack([0xf2]);
+      if (this.info.powerControl) {
+        await this.variable(4, 1, 5000); // firmware timeout if the tab disappears
+        await this.variable(1, 0x0f, 1);
+        await this.ack([0xf2]);
+      } else {
+        // LK_Device.SetMode: PIN_AUDIO (bit 30) high for DMG, low for AGB.
+        await this.ack([0xf5, ...u32(0x40000000), mode === 'DMG' ? 1 : 0]);
+      }
       await delay(100);
-      await this.ack([mode === 'AGB' ? 0xc9 : 0xb4]);
+      if (this.info.powerControl) await this.ack([mode === 'AGB' ? 0xc9 : 0xb4]);
       return await task();
     } finally {
-      try { if (!this.poisoned && !this.transport.closed) await this.ack([0xf3]); }
+      try { if (!this.poisoned && !this.transport.closed) await this.idle(); }
       finally { this.busy = false; }
     }
   }

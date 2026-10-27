@@ -77,31 +77,39 @@ export class CartridgeService {
     return this.lk.powered(cart.mode, async () => {
       cancelled(signal); await this.checkIdentity(cart);
       const data = new Uint8Array(cart.romSize), passes = verify ? 2 : 1;
-      for (let pass = 0; pass < passes; pass++) {
-        if (cart.mode === 'AGB') {
-          for (let offset = 0; offset < data.length; offset += 4096) {
-            cancelled(signal);
-            const block = await this.lk.readROM(offset, Math.min(4096, data.length - offset));
-            if (!pass) data.set(block, offset);
-            else if (!sameBytes(data.subarray(offset, offset + block.length), block)) throw new Error(`La segunda lectura no coincide en 0x${offset.toString(16)}. No se generó un respaldo verificado.`);
-            onProgress((pass * data.length + offset + block.length) / (passes * data.length), pass ? 'Verificando ROM' : 'Leyendo ROM');
-          }
-        } else {
-          for (let bank = 0; bank < data.length / 16384; bank++) {
-            cancelled(signal);
-            const address = await selectROMBank(this.lk, cart, bank);
-            for (let offset = 0; offset < 16384; offset += 4096) {
+      try {
+        for (let pass = 0; pass < passes; pass++) {
+          if (cart.mode === 'AGB') {
+            for (let offset = 0; offset < data.length; offset += 4096) {
               cancelled(signal);
-              const block = await this.lk.readROM(address + offset, 4096), position = bank * 16384 + offset;
-              if (!pass) data.set(block, position);
-              else if (!sameBytes(data.subarray(position, position + block.length), block)) throw new Error(`La segunda lectura no coincide en el banco ${bank}. Revisa los contactos.`);
-              onProgress((pass * data.length + position + block.length) / (passes * data.length), pass ? 'Verificando ROM' : 'Leyendo ROM');
+              const block = await this.lk.readROM(offset, Math.min(4096, data.length - offset));
+              if (!pass) data.set(block, offset);
+              else if (!sameBytes(data.subarray(offset, offset + block.length), block)) throw new Error(`La segunda lectura no coincide en 0x${offset.toString(16)}. No se generó un respaldo verificado.`);
+              onProgress((pass * data.length + offset + block.length) / (passes * data.length), pass ? 'Verificando ROM' : 'Leyendo ROM');
+            }
+          } else {
+            for (let bank = 0; bank < data.length / 16384; bank++) {
+              cancelled(signal);
+              const address = await selectROMBank(this.lk, cart, bank);
+              for (let offset = 0; offset < 16384; offset += 4096) {
+                cancelled(signal);
+                const block = await this.lk.readROM(address + offset, 4096), position = bank * 16384 + offset;
+                if (!pass) data.set(block, position);
+                else if (!sameBytes(data.subarray(position, position + block.length), block)) throw new Error(`La segunda lectura no coincide en el banco ${bank}. Revisa los contactos.`);
+                onProgress((pass * data.length + position + block.length) / (passes * data.length), pass ? 'Verificando ROM' : 'Leyendo ROM');
+              }
             }
           }
         }
+      } finally {
+        await this.resetMBC1(cart);
       }
       return data;
     });
+  }
+  async resetMBC1(cart) {
+    // Without a power switch, bank registers survive between operations.
+    if (cart.mapper === 'MBC1' && !this.lk.poisoned && !this.lk.transport.closed) await selectROMBank(this.lk, cart, 0);
   }
   async selectRAM(cart, bank) {
     if (cart.mapper === 'MBC1') { await this.lk.mapperWrite(0x6000, 1); await this.lk.mapperWrite(0x4000, bank); }
@@ -113,6 +121,7 @@ export class CartridgeService {
     try { return await task(); }
     finally {
       if (!this.lk.poisoned && !this.lk.transport.closed && cart.mapper !== 'ROM') await this.lk.mapperWrite(0, 0);
+      await this.resetMBC1(cart);
     }
   }
   async readSaveBlocks(cart, signal, onProgress) {

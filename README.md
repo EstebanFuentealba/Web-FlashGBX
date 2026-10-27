@@ -113,3 +113,5 @@ Un teléfono en suspensión puede detener las tareas del navegador. El bloqueo d
 ## Licencia y procedencia
 
 GPL-3.0-or-later. Incluye `LICENSE`, y el texto se sirve en `dist/LICENSE.txt`. Ver [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md). Proyecto independiente; no es una versión oficial de Lesserkuma.
+
+La identificación GB/GBC incluye `dist/config/db_DMG.json` de FlashGBX. Se busca por SHA-1 de los primeros 384 bytes, con la revisión leída de `0x14C`; por ejemplo, una coincidencia con `DMG-AFRE` y revisión 0 se muestra como `DMG-AFRE-0`. Game Name usa el nombre de la base y ROM Title conserva la cabecera. Si no hay coincidencia, se conserva el código de cabecera cuando exista o se indica código desconocido. La consulta ocurre en el navegador después de dejar el hardware en reposo, sin enviar datos del cartucho a terceros. Los perfiles `fc_*.txt` no son necesarios para esta identificación.

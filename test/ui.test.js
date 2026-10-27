@@ -19,18 +19,19 @@ class Element {
   setAttribute() {}
   getContext() { return {fillRect(){}}; }
 }
-async function app(rom) {
+async function app(rom, resolveMetadata) {
   const html = await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
   const elements = Object.fromEntries([...html.matchAll(/id="([^"]+)"/g)].map(m => [m[1], new Element()]));
   const radios = ['DMG','AGB'].map(value => Object.assign(new Element(),{value}));
   elements.transport.value='serial'; elements['reader-model'].value='2000000'; elements['gba-size'].value='33554432'; elements.verify.checked=true;
   const options=new Element(), wire=new FirmwareSimulator(rom);
   wire.open=async () => {}; wire.label='simulated serial';
+  const Service = class extends CartridgeService { constructor(lk) { super(lk, resolveMetadata ? {resolveMetadata} : {}); } };
   const document = {getElementById:id => elements[id], querySelector:() => options, querySelectorAll:() => radios, addEventListener(){}, createElement:() => new Element()};
   const window={addEventListener(){}}; window.self=window; window.top=window;
   const source=(await readFile(new URL('../dist/app.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'');
   const logoSource=(await readFile(new URL('../dist/lib/logo.js',import.meta.url),'utf8')).replace(/export function/g,'function');
-  vm.runInNewContext(logoSource+'\n'+source,{document,window,navigator:{userAgent:'test',serial:{}},isSecureContext:true,requestTransport:async () => wire,LKDevice,CartridgeService,sizeLabel,createDemo,AbortController,TextEncoder,TextDecoder,performance,setInterval,clearInterval,URL,Blob,console});
+  vm.runInNewContext(logoSource+'\n'+source,{document,window,navigator:{userAgent:'test',serial:{}},isSecureContext:true,requestTransport:async () => wire,LKDevice,CartridgeService:Service,sizeLabel,createDemo,AbortController,TextEncoder,TextDecoder,performance,setInterval,clearInterval,URL,Blob,console});
   return {elements,radios,wire};
 }
 const actionIds=['inspect','analyze','backup-rom','backup-save','write-rom','restore'];
@@ -74,4 +75,12 @@ test('GBA selection and size changes re-read the cartridge automatically', async
   assert.equal(e['cart-rom'].textContent,'1 MiB');
   assert.equal(wire.commands.filter(c => c[0]===0xc1).length,2);
   await e.restore.emit('click'); assert.match(e.message.textContent,/partidas GBA/);
+});
+
+test('database product code and header revision appear together without changing ROM Title', async () => {
+  const {elements:e,radios}=await app(gbROM(), async () => ({entry:{gn:'Frogger',gc:'DMG-AFRE'},status:'matched'}));
+  await e.connect.emit('click'); await radios[0].emit('change');
+  assert.equal(e['cart-code'].textContent,'DMG-AFRE-0');
+  assert.equal(e['cart-name'].textContent,'Frogger');
+  assert.equal(e['rom-title'].textContent,'TEST GARDEN');
 });

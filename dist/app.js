@@ -55,18 +55,16 @@ function showCart() {
   if (cart) {
     $('rom-title').textContent = cart.title;
     const header = cart.header;
-    $('cart-code').textContent = cart.code ? `AGB-${cart.code}-${header?.[0xbc] ?? '?'}` : '—';
+    $('cart-code').textContent = cart.productCode ? `${cart.productCode}-${cart.revision}` : `Desconocido · revisión ${cart.revision ?? '?'}`;
     if (header && cart.mode === 'DMG') {
       $('rom-checksum').textContent = `0x${((header[0x14e] << 8) | header[0x14f]).toString(16).toUpperCase().padStart(4,'0')}`;
-      const code = new TextDecoder().decode(header.subarray(0x13f,0x143));
-      if ((header[0x143] & 0x80) && /^[A-Z][A-Z0-9]{3}$/.test(code)) $('cart-code').textContent = `DMG-${code}-${header[0x14c]}`;
     }
     $('cart-rtc').textContent = cart.rtc ? 'Presente · lectura no disponible' : 'No disponible';
     renderLogo($('cart-logo'), header, cart.mode);
     $('cart-checksum').textContent = header && !demo ? `Valid (0x${header[cart.mode === 'AGB' ? 0xbd : 0x14d].toString(16).toUpperCase().padStart(2, '0')})` : 'Demo';
     if (header && !demo) $('cart-checksum').classList.add('valid');
     $('cart-system').textContent = cart.system;
-    $('cart-name').textContent = cart.title;
+    $('cart-name').textContent = cart.gameName || cart.title;
     $('cart-rom').textContent = sizeLabel(cart.romSize);
     $('cart-save').textContent = cart.mode === 'AGB' ? 'No soportada' : cart.ramSize ? sizeLabel(cart.ramSize) : 'Sin RAM';
     $('cart-mapper').textContent = cart.mapper || 'No soportado';
@@ -159,6 +157,7 @@ async function identifyCartridge() {
   cart = null; showCart();
   if (!service || !['DMG','AGB'].includes($('console').value)) throw new Error('Conecta el lector y selecciona una plataforma.');
   cart = await service.inspect($('console').value, Number($('gba-size').value)); showCart();
+  if (cart.metadataStatus === 'unavailable') log('No se pudo consultar db_DMG.json; se muestran los datos disponibles en la cabecera.');
   if (cart.unsupported) message(cart.unsupported, true);
   else message(`${cart.title} identificado. ${demo ? 'Datos de demostración.' : 'Listo para respaldar.'}`);
 }

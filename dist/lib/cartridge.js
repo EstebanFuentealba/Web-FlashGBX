@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+import { lookupGBMetadata, applyGBMetadata } from './metadata.js';
 const text = bytes => new TextDecoder('ascii').decode(bytes).replace(/[^\x20-\x7e]/g, '').trim();
 export const sameBytes = (a, b) => a.length === b.length && a.every((value, i) => value === b[i]);
 export const sizeLabel = n => n >= 1048576 ? `${n / 1048576} MiB` : `${n / 1024} KiB`;
@@ -9,6 +10,11 @@ export function parseGB(header) {
   let checksum = 0;
   for (let i = 0x134; i <= 0x14c; i++) checksum = (checksum - header[i] - 1) & 255;
   if (checksum !== header[0x14d] || !sameBytes(header.subarray(0x104, 0x134), GB_LOGO)) throw new Error('Cabecera GB inválida. Comprueba el modo, los contactos y la inserción del cartucho.');
+  const cgb = [0x80,0xc0].includes(header[0x143]);
+  const rawTitle = header.subarray(0x134, cgb ? 0x143 : 0x144);
+  const candidate = text(header.subarray(0x13f,0x143));
+  const code = cgb && /^[ABHKV][A-Z0-9]{2}[ABDEFIJKPSUXY]$/.test(candidate) ? candidate : '';
+  const title = text(code ? rawTitle.subarray(0,11) : rawTitle) || 'SIN TITULO';
   const type = header[0x147];
   const mapper = [0,8,9].includes(type) ? 'ROM' : [1,2,3].includes(type) ? 'MBC1' : [5,6].includes(type) ? 'MBC2' : [15,16,17,18,19].includes(type) ? 'MBC3' : [25,26,27,28,29,30].includes(type) ? 'MBC5' : null;
   const romSize = header[0x148] <= 8 ? 32768 * 2 ** header[0x148] : ({ 0x52: 72, 0x53: 80, 0x54: 96 }[header[0x148]] || 0) * 16384;
@@ -21,7 +27,7 @@ export function parseGB(header) {
   if (mapper === 'MBC2' && romSize > 262144) unsupported = 'Variante MBC2 no soportada.';
   if (mapper === 'MBC3' && (romSize > 2097152 || ramSize > 32768)) unsupported = 'MBC30 y variantes ampliadas aún no soportadas.';
   if (mapper === 'MBC5' && [28,29,30].includes(type) && ramSize > 65536) unsupported = 'Variante MBC5 con rumble no soportada.';
-  return { mode: 'DMG', title: text(header.subarray(0x134, header[0x143] & 0x80 ? 0x13f : 0x144)) || 'SIN TITULO', system: header[0x143] & 0x80 ? 'Game Boy Color' : 'Game Boy', mapper, type, romSize, ramSize: ramSize || 0, rtc: [15,16].includes(type), unsupported, header: header.slice(0,0x150) };
+  return { mode: 'DMG', title, code, productCode: code ? `DMG-${code}` : '', revision: header[0x14c], system: cgb ? 'Game Boy Color' : 'Game Boy', mapper, type, romSize, ramSize: ramSize || 0, rtc: [15,16].includes(type), unsupported, header: header.slice(0,0x150) };
 }
 
 export function parseGBA(header, romSize) {
@@ -31,7 +37,7 @@ export function parseGBA(header, romSize) {
   checksum = (checksum - 0x19) & 255;
   if (checksum !== header[0xbd] || header[0xb2] !== 0x96) throw new Error('Cabecera GBA inválida. Comprueba el modo y los contactos del cartucho.');
   if (![1,2,4,8,16,32].map(n => n * 1048576).includes(romSize)) throw new Error('Selecciona el tamaño de ROM GBA.');
-  return { mode: 'AGB', title: text(header.subarray(0xa0,0xac)) || 'SIN TITULO', code: text(header.subarray(0xac,0xb0)), system: 'Game Boy Advance', mapper: 'Lineal', romSize, ramSize: 0, rtc: false, unsupported: '', header: header.slice(0,0xc0) };
+  return { mode: 'AGB', title: text(header.subarray(0xa0,0xac)) || 'SIN TITULO', code: text(header.subarray(0xac,0xb0)), productCode: `AGB-${text(header.subarray(0xac,0xb0))}`, revision: header[0xbc], system: 'Game Boy Advance', mapper: 'Lineal', romSize, ramSize: 0, rtc: false, unsupported: '', header: header.slice(0,0xc0) };
 }
 
 export async function selectROMBank(lk, cart, bank) {
@@ -54,10 +60,11 @@ export async function selectROMBank(lk, cart, bank) {
 const cancelled = signal => { if (signal?.aborted) throw new DOMException('Operación cancelada.', 'AbortError'); };
 
 export class CartridgeService {
-  constructor(lk) { this.lk = lk; }
+  constructor(lk, { resolveMetadata = lookupGBMetadata } = {}) { this.lk = lk; this.resolveMetadata = resolveMetadata; }
   async inspect(mode, gbaSize = 32 * 1048576) {
-    return this.lk.powered(mode, async () => {
-      const header = await this.lk.readROM(0, mode === 'DMG' ? 0x150 : 0xc0);
+    let header;
+    const cart = await this.lk.powered(mode, async () => {
+      header = await this.lk.readROM(0, mode === 'DMG' ? 0x180 : 0xc0);
       const cart = mode === 'DMG' ? parseGB(header) : parseGBA(header, gbaSize);
       // MBC1 multicarts use a different bank layout. Detect the repeated logo at bank 16.
       if (cart.mapper === 'MBC1' && cart.romSize >= 512 * 1024) {
@@ -67,6 +74,8 @@ export class CartridgeService {
       }
       return cart;
     });
+    // Resolve descriptive metadata after returning the hardware to idle.
+    return mode === 'DMG' ? applyGBMetadata(cart, await this.resolveMetadata(header)) : cart;
   }
   async checkIdentity(cart) {
     if (cart.unsupported) throw new Error(cart.unsupported);

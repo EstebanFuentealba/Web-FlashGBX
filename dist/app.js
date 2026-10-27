@@ -7,6 +7,12 @@ const $ = id => document.getElementById(id);
 let lk = null, transport = null, service = null, cart = null, busy = false, demo = false;
 let controller = null, wakeLock = null, pendingRestore = null, backupReady = false;
 const logs = [], urls = [];
+let transferStarted = 0, transferTimer = null;
+function elapsed() {
+  const seconds = (performance.now() - transferStarted) / 1000;
+  $('transfer-elapsed').textContent = `${Math.floor(seconds)} s`;
+  return seconds;
+}
 
 function log(message) {
   logs.push(`${new Date().toLocaleTimeString('es-CL')}  ${message}`);
@@ -21,7 +27,7 @@ function updateControls() {
   for (const id of ['reader-model','transport']) $(id).disabled = connected || locked;
   for (const id of ['console','gba-size']) $(id).disabled = locked || demo;
   $('connect').disabled = locked || demo;
-  $('connect').textContent = connected && !demo ? 'Desconectar lector' : 'Conectar por USB';
+  $('connect').textContent = connected && !demo ? 'Disconnect' : 'Connect';
   $('inspect').disabled = !connected || locked || !['DMG','AGB'].includes($('console').value);
   $('demo').disabled = connected || locked;
   $('exit-demo').disabled = busy;
@@ -35,12 +41,24 @@ function updateControls() {
   $('device-led').classList.toggle('on', connected && !demo);
   $('demo-banner').hidden = !demo;
   $('power-notice').hidden = demo || !service || lk?.info?.powerControl !== false;
+  for (const radio of document.querySelectorAll('input[name=platform]')) { radio.disabled = locked || demo; radio.checked = radio.value === $('console').value; }
+  $('cartridge-title').textContent = `${$('console').value === 'AGB' ? 'Game Boy Advance' : 'Game Boy'} Cartridge Information`;
   $('cart-empty').hidden = !!cart; $('cart-info').hidden = !cart;
   $('gba-size-field').hidden = $('console').value !== 'AGB';
-  $('mode-hint').textContent = $('console').value === 'AGB' ? 'GBA usa 3,3 V. El tamaño se selecciona manualmente; las partidas GBA aún no están soportadas.' : 'Selecciona la consola antes de alimentar el cartucho.';
+  $('mode-hint').textContent = $('console').value === 'AGB' ? 'GBA · 3,3 V. Selecciona el tamaño de ROM; partidas GBA aún no disponibles.' : $('console').value === 'DMG' ? 'Game Boy / Color · 5 V. Partidas SRAM y MBC2; el respaldo no incluye RTC.' : 'Selecciona la plataforma antes de alimentar el cartucho.';
 }
 function showCart() {
+  for (const id of ['cart-name','rom-title','cart-code','cart-rtc','cart-logo','cart-checksum','cart-rom','cart-save','cart-mapper','rom-verification']) {
+    $(id).textContent = '—'; $(id).classList.remove('valid');
+  }
   if (cart) {
+    $('rom-title').textContent = cart.title;
+    const header = cart.header;
+    $('cart-code').textContent = cart.code ? `AGB-${cart.code}-${header?.[0xbc] ?? '?'}` : '—';
+    $('cart-rtc').textContent = cart.rtc ? 'Presente · lectura no disponible' : 'No disponible';
+    $('cart-logo').textContent = !demo && cart.mode === 'DMG' ? 'Valid' : 'No verificado';
+    $('cart-checksum').textContent = header ? `Valid (0x${header[cart.mode === 'AGB' ? 0xbd : 0x14d].toString(16).toUpperCase().padStart(2, '0')})` : 'Demo';
+    if (header) $('cart-checksum').classList.add('valid');
     $('cart-system').textContent = cart.system;
     $('cart-name').textContent = cart.title;
     $('cart-rom').textContent = sizeLabel(cart.romSize);
@@ -50,10 +68,17 @@ function showCart() {
   }
   updateControls();
 }
-function progress(value, label) {
+function progress(value, label, bytes) {
   $('transfer').hidden = false; $('progress').value = value;
-  $('progress-value').textContent = `${Math.round(value * 100)} %`;
+  $('progress-value').textContent = `${Math.round(value * 100)}%`;
   $('transfer-title').textContent = label;
+  if (transferStarted) {
+    const seconds = elapsed();
+    if (Number.isFinite(bytes) && !demo) {
+      $('transfer-bytes').textContent = sizeLabel(Math.round(bytes));
+      $('transfer-rate').textContent = seconds > 0 ? `${(bytes / seconds / 1024).toFixed(2)} KiB/s` : '—';
+    }
+  }
 }
 async function holdScreen() {
   if (!navigator.wakeLock || document.visibilityState !== 'visible') return;
@@ -64,22 +89,26 @@ async function releaseScreen() { try { await wakeLock?.release(); } catch {} wak
 async function run(label, work, { transferWork = false } = {}) {
   if (busy) return;
   busy = true; controller = new AbortController(); updateControls(); message(''); log(label);
-  if (transferWork) { progress(0, label); $('cancel').hidden = false; $('cancel').disabled = false; }
+  if (transferWork) {
+    transferStarted = performance.now(); $('transfer-bytes').textContent = '—'; $('transfer-rate').textContent = '—';
+    progress(0, label); transferTimer = setInterval(elapsed, 500);
+    $('cancel').hidden = false; $('cancel').disabled = false;
+  }
   try {
     // USB chooser must be called before any await that would consume user activation.
     if (transferWork) await holdScreen();
     const result = await work(controller.signal);
     log(`${label}: completado.`);
-    if (transferWork) { progress(1, 'Operación completada'); $('cancel').hidden = true; }
+    if (transferWork) { progress(1, 'Operación completada'); $('cancel').disabled = true; }
     return result;
   } catch (error) {
     const cancelled = error.name === 'AbortError' || error.name === 'NotFoundError';
     const explanation = error.name === 'NotFoundError' ? 'No se seleccionó un lector.' : error.name === 'SecurityError' ? 'Chrome no pudo acceder al USB. Abre la URL directamente por HTTPS y comprueba los permisos.' : error.message;
     message(explanation, !cancelled); log(`Interrumpido: ${explanation}`);
-    if (transferWork) { $('transfer-title').textContent = cancelled ? 'Operación cancelada' : 'Operación interrumpida'; $('cancel').hidden = true; }
+    if (transferWork) { $('transfer-title').textContent = cancelled ? 'Operación cancelada' : 'Operación interrumpida'; $('cancel').disabled = true; }
     if (lk?.poisoned || transport?.closed) await disconnect();
     return null;
-  } finally { await releaseScreen(); busy = false; controller = null; updateControls(); }
+  } finally { if (transferWork) { clearInterval(transferTimer); elapsed(); transferStarted = 0; } await releaseScreen(); busy = false; controller = null; updateControls(); }
 }
 async function disconnect() {
   try { await lk?.close(); if (!lk) await transport?.close(); }
@@ -106,6 +135,7 @@ async function addDownload(data, filename, label) {
   return file;
 }
 $('connect').addEventListener('click', () => run(service ? 'Desconectando' : 'Conectando lector', async () => {
+  document.querySelector('.options').open = false;
   if (service) { await disconnect(); return; }
   try {
     transport = await requestTransport($('transport').value);
@@ -125,14 +155,19 @@ $('inspect').addEventListener('click', () => run('Identificando cartucho', async
   else message(`${cart.title} identificado. ${demo ? 'Datos de demostración.' : 'Listo para respaldar.'}`);
 }));
 for (const id of ['console','gba-size']) $(id).addEventListener('change', () => { cart = null; showCart(); });
+for (const radio of document.querySelectorAll('input[name=platform]')) radio.addEventListener('change', () => {
+  $('console').value = radio.value; $('console').dispatchEvent(new Event('change'));
+});
 $('backup-rom').addEventListener('click', () => run('Respaldando ROM', async signal => {
-  const data = await service.backupROM(cart, { signal, onProgress: progress, verify: $('verify').checked });
+  const data = await service.backupROM(cart, { signal, onProgress: (p, label) => progress(p, label, p * cart.romSize * ($('verify').checked ? 2 : 1)), verify: $('verify').checked });
+  $('rom-verification').textContent = demo ? 'Demo' : $('verify').checked ? 'Two reads match' : 'Single read';
+  $('rom-verification').classList.toggle('valid', !demo && $('verify').checked);
   const ext = demo ? 'bin' : cart.mode === 'AGB' ? 'gba' : cart.system === 'Game Boy Color' ? 'gbc' : 'gb';
   await addDownload(data, `${demo ? 'DEMO_' : ''}${safeName(cart.title)}.${ext}`, demo ? 'Datos ficticios' : $('verify').checked ? 'Dos lecturas coinciden' : 'Una lectura · sin verificación');
   message('Respaldo preparado. Toca Descargar en «Tus respaldos» para guardarlo en el teléfono.');
 }, { transferWork: true }));
 $('backup-save').addEventListener('click', () => run('Respaldando partida', async signal => {
-  const data = await service.backupSave(cart, { signal, onProgress: progress });
+  const data = await service.backupSave(cart, { signal, onProgress: (p, label) => progress(p, label, p * cart.ramSize * 2) });
   await addDownload(data, `${demo ? 'DEMO_' : ''}${safeName(cart.title)}_${Date.now()}.sav`, demo ? 'Datos ficticios' : 'Dos lecturas coinciden · sin RTC');
   message('Partida verificada y preparada. Toca Descargar para conservar el archivo.');
 }, { transferWork: true }));
@@ -176,11 +211,17 @@ $('confirm-restore').addEventListener('click', async () => {
   }, { transferWork: true });
 });
 $('demo').addEventListener('click', () => {
+  document.querySelector('.options').open = false;
   const d = createDemo(); demo = true; service = d.service;
   $('console').value = 'DMG'; $('device-name').textContent = d.info.name; $('device-detail').textContent = 'Simulación local · sin hardware';
-  message('Esta demostración genera archivos ficticios. Pulsa Identificar cartucho para explorar.'); updateControls();
+  message('Esta demostración genera archivos ficticios. Pulsa Refresh para explorar.'); updateControls();
 });
 $('exit-demo').addEventListener('click', async () => { await disconnect(); message('Demostración cerrada. Puedes conectar tu lector.'); });
+document.addEventListener('click', event => {
+  const options = document.querySelector('.options');
+  if (!options.contains(event.target)) options.open = false;
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape') document.querySelector('.options').open = false; });
 $('export-log').addEventListener('click', () => {
   const content = `FlashGBX Pocket 0.1.0\n${navigator.userAgent}\nSecure: ${isSecureContext}\nWebUSB: ${!!navigator.usb}\nWebSerial: ${!!navigator.serial}\n\n${logs.join('\n')}`;
   const file = objectFile(content, 'flashgbx-diagnostico.txt', 'text/plain');

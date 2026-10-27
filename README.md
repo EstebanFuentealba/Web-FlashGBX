@@ -1,6 +1,6 @@
 # FlashGBX Pocket
 
-Cliente web independiente del protocolo FlashGBX LK L15. La interfaz está en español y se adapta a pantallas de 390 px y superiores. Aplicación estática, sin dependencias de ejecución, backend, cuentas propias, telemetría ni subida de ROMs/partidas. Los recursos, el controlador y los datos se procesan en el navegador; el alojamiento puede tener su propia autenticación.
+Cliente web independiente del protocolo FlashGBX LK L15. La interfaz reproduce la distribución de FlashGBX de escritorio: información del cartucho, funciones, estado de transferencia y barra de conexión. Conserva los nombres de funciones en inglés y los mensajes y ayuda en español; se adapta a pantallas de 390 px y superiores. Las funciones aún no implementadas aparecen deshabilitadas. Aplicación estática, sin dependencias de ejecución, backend, cuentas propias, telemetría ni subida de ROMs/partidas. Los recursos, el controlador y los datos se procesan en el navegador; el alojamiento puede tener su propia autenticación.
 
 ## Dispositivo objetivo
 

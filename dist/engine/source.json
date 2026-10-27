@@ -1,0 +1,9 @@
+{
+  "engine": "FlashGBX",
+  "version": "5.1",
+  "source": "https://github.com/Lesserkuma/FlashGBX",
+  "snapshot": "Lesserkuma-FlashGBX-e4467d7",
+  "sha256": "11d66ea5516c603eb6085790fdcc22ba2fce13003b9bd097d57806fbd149039b",
+  "pyodide": "314.0.7",
+  "commit": "e4467d79635d868f780d099112e55c65118dec58"
+}

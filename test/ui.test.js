@@ -49,8 +49,8 @@ test('Connect enables platform radios; selecting one auto-identifies and enables
   assert.equal(e['cart-logo'].children.length,1);
   await e['backup-save'].emit('click');
   assert.match(e.message.textContent,/no tiene memoria/);
-  await e['write-rom'].emit('click'); assert.match(e.message.textContent,/aún no está implementada/);
-  await e.analyze.emit('click'); assert.match(e.message.textContent,/aún no está implementada/);
+  await e['write-rom'].emit('click'); assert.match(e.message.textContent,/Conecta.*programar/);
+  await e.analyze.emit('click'); assert.match(e.message.textContent,/Conecta.*analizar/);
   await e.connect.emit('click');
   assert.ok(radios.every(r => r.disabled)); assert.ok(actionIds.every(id => e[id].disabled));
   assert.equal(e['cart-name'].textContent,'—');

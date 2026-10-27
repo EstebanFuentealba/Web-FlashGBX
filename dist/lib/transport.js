@@ -35,6 +35,25 @@ export class ByteQueue {
     }
     clearTimeout(w.timer); this.waiter = null; w.resolve(out);
   }
+  readPartial(size, timeout = 1000) {
+    // pyserial permits short reads at its deadline. This must not poison the
+    // stream: probing a firmware/flash chip legitimately times out.
+    if (this.error) return Promise.reject(this.error);
+    if (!Number.isInteger(size) || size < 1 || size > 65536) return Promise.reject(new Error('Longitud de lectura inválida.'));
+    if (this.waiter) return Promise.reject(new Error('No se permiten lecturas simultáneas.'));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (!this.waiter) return;
+        this.waiter.size = Math.min(size, this.length);
+        this.flush();
+      }, Math.max(0, timeout));
+      this.waiter = {size, resolve, reject, timer}; this.flush();
+    });
+  }
+  clear() {
+    if (this.waiter) throw new Error('Lectura en curso.');
+    this.chunks = []; this.length = 0;
+  }
   read(size, timeout = 4000) {
     if (this.error) return Promise.reject(this.error);
     if (!Number.isInteger(size) || size < 1 || size > 65536) return Promise.reject(new Error('Longitud de lectura inválida.'));

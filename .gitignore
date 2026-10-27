@@ -5,3 +5,6 @@ node_modules/
 .DS_Store
 *.tgz
 *.tar.gz
+
+__pycache__/
+*.pyc

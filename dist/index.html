@@ -24,7 +24,7 @@
           <span>ROM Checksum:</span><span id="rom-checksum" title="Checksum almacenado en la cabecera; se verifica al leer la ROM completa">—</span>
           <span class="sr-only">ROM Verification:</span><span id="rom-verification" class="sr-only">—</span>
           <span>ROM Size:</span><div class="value-field"><span id="cart-rom">—</span><label id="gba-size-field" hidden><span class="sr-only">Tamaño de ROM GBA</span><select id="gba-size"><option value="1048576">1 MiB</option><option value="2097152">2 MiB</option><option value="4194304">4 MiB</option><option value="8388608">8 MiB</option><option value="16777216">16 MiB</option><option value="33554432" selected>32 MiB</option></select></label></div>
-          <span>Save Type:</span><span id="cart-save" class="readout">—</span>
+          <span>Save Type:</span><div class="value-field"><span id="cart-save">—</span><select id="save-type" aria-label="Tipo de partida" hidden><option value="auto">Auto</option></select></div>
           <span>Mapper Type:</span><span id="cart-mapper">—</span>
         </div>
         <div class="profile"><label for="cart-profile">Profile:</label><select id="cart-profile" disabled><option>Generic ROM Cartridge</option></select></div>
@@ -36,11 +36,12 @@
           <div class="platform"><span>Platform:</span><label><input type="radio" name="platform" disabled value="DMG"> Game Boy</label><label><input type="radio" name="platform" disabled value="AGB"> Game Boy Advance</label></div>
           <select id="console" hidden aria-label="Plataforma"><option value="" selected>Selecciona plataforma</option><option value="DMG">Game Boy / Color · 5 V</option><option value="AGB">Game Boy Advance · 3,3 V</option></select>
           <div class="function-grid">
-            <button id="inspect" disabled>Refresh</button><button id="analyze" disabled title="El análisis de flashcarts aún no está implementado">Analyze Flash Cart</button>
+            <button id="inspect" disabled>Refresh</button><button id="analyze" disabled>Analyze Flash Cart</button>
             <button id="backup-rom" disabled>Backup ROM</button><button id="backup-save" disabled>Backup Save Data</button>
-            <button id="write-rom" disabled title="La programación de ROMs aún no está implementada">Write ROM</button><button id="restore" disabled>Write Save Data <span aria-hidden="true">▾</span></button>
+            <button id="write-rom" disabled>Write ROM</button><button id="restore" disabled>Write Save Data <span aria-hidden="true">▾</span></button>
           </div>
           <p id="mode-hint" class="hint">Selecciona la plataforma antes de alimentar el cartucho.</p>
+          <input type="file" id="rom-file" accept=".gb,.gbc,.gba,.bin,.isx" hidden>
           <input type="file" id="save-file" accept=".sav,application/octet-stream" hidden>
         </fieldset>
         <fieldset id="transfer" class="transfer"><legend>Transfer Status</legend>
@@ -56,13 +57,29 @@
         <label>Lector<select id="reader-model"><option value="2000000">GBFlash · 2 Mbaud</option><option value="1000000">GBxCart RW · 1 Mbaud</option><option value="1500000">GBxCart RW · 1,5 Mbaud</option></select></label>
         <label>Conexión<select id="transport"><option value="usb">WebUSB · Android</option><option value="serial">Web Serial · Escritorio</option></select></label>
         <label class="check"><input id="verify" type="checkbox" checked> Verificar ROM con segunda lectura</label>
-        <button id="demo">Explorar demostración</button><button id="export-log">Descargar diagnóstico</button>
-        <details><summary>Compatibilidad y ayuda</summary><p>GB/GBC: ROM, MBC1, MBC2, MBC3 y MBC5; partidas SRAM y MBC2. GBA: lectura de ROM lineal, con tamaño manual. Sin partidas GBA, escritura de ROM, análisis de flashcarts ni respaldo RTC.</p><p>Inserta y retira el cartucho con el USB físicamente desconectado. Mantén Chrome abierto durante las transferencias.</p><div id="environment"></div><p>Cliente independiente, experimental. <a href="https://github.com/Lesserkuma/FlashGBX">FlashGBX de Lesserkuma</a> · <a href="./LICENSE.txt">GPL v3</a></p></details>
+        <button id="demo">Explorar demostración</button><button id="load-engine">Herramientas de FlashGBX</button><button id="export-log">Descargar diagnóstico</button>
+        <details><summary>Compatibilidad y ayuda</summary><p>GB/GBC: ROM, MBC1, MBC2, MBC3 y MBC5; partidas SRAM y MBC2. El motor FlashGBX 5.1 se ejecuta en el navegador mediante WebAssembly. Incluye perfiles de flashcarts, partidas GBA y RTC. Requiere Chrome con WebUSB y aislamiento de origen; la compatibilidad concreta depende del lector, firmware y cartucho.</p><p>Inserta y retira el cartucho con el USB físicamente desconectado. Mantén Chrome abierto durante las transferencias.</p><div id="environment"></div><p>Cliente independiente, experimental. <a href="https://github.com/Lesserkuma/FlashGBX">FlashGBX de Lesserkuma</a> · <a href="./LICENSE.txt">GPL v3</a></p></details>
       </div></details><button id="connect">Connect</button></div>
     </div>
     <section id="downloads" hidden><h2>Tus respaldos</h2><p class="hint">Pulsa Descargar para guardar cada archivo. La lista se vacía al recargar.</p><div id="download-list"></div></section>
+    <details id="engine-tools" class="engine-tools"><summary>Herramientas de FlashGBX 5.1</summary>
+      <p class="hint">Todo se procesa en este navegador. Los archivos del espacio de trabajo se pierden al recargar; descarga tus respaldos.</p>
+      <p id="engine-status" role="status">El motor se carga al conectar el lector o abrir estas herramientas.</p>
+      <div class="tool-grid">
+        <button id="read-rtc" disabled>Read RTC</button><button id="edit-rtc" disabled>Write RTC</button><button id="erase-save" disabled>Erase Save Data</button><button id="dump-report" disabled>Dump Report</button>
+        <label class="check"><input id="include-rtc" type="checkbox" checked> Incluir RTC en partidas</label>
+        <label class="check"><input id="chip-erase" type="checkbox"> Preferir borrado completo del chip</label>
+      </div>
+      <div class="tool-grid"><label>Archivo de trabajo<input id="engine-file" type="file" accept=".sav,.bin,.isx,.zip,.map,.gb,.gbc,.gba"></label><label>Paleta Camera<select id="camera-palette"><option>grayscale</option><option>dmg</option><option>sgb</option><option>cgb1</option><option>cgb2</option><option>cgb3</option></select></label><button id="camera-extract">Extraer fotos Game Boy Camera</button><button id="convert-isx">Convertir ISX a ROM</button></div>
+      <details><summary>Opciones avanzadas, RTC y consola Python</summary><label>Opciones del motor (JSON)<textarea id="engine-options" rows="3" spellcheck="false">{}</textarea></label><p class="hint">Opciones especiales: mbc (mapper), bl_offset, bl_size, bl_layout, fixHeader y fixLogo. Los perfiles y algoritmos son los del motor original.</p><label>Valores RTC (JSON)<textarea id="rtc-values" rows="5" spellcheck="false">{}</textarea></label>
+      <p class="hint">Consola del motor original. Variables: device, header, profiles, DMG_Mapper, PocketCamera. Los archivos export-… guardados en /data se ofrecen para descargar. Los comandos pueden modificar el cartucho.</p>
+      <textarea id="engine-code" rows="7" spellcheck="false" aria-label="Código Python">print(device.GetFullName() if device else "Sin lector")</textarea><button id="engine-execute">Ejecutar Python</button><pre id="engine-output"></pre></details>
+      <details><summary>Firmware GBFlash</summary><p class="hint">Selecciona el ZIP de firmware correspondiente al lector en «Archivo de trabajo». Se usará el actualizador original de GBFlash. El lector puede requerir volver a conceder acceso USB.</p><button id="firmware-update" disabled>Actualizar firmware GBFlash</button></details>
+      <pre id="flash-analysis" hidden></pre>
+    </details>
     <details class="log-panel"><summary>Registro de actividad</summary><pre id="log">Listo para conectar.</pre></details>
   </main>
-  <dialog id="restore-dialog"><form method="dialog"><p class="eyebrow">RESTAURAR PARTIDA</p><h2>Tu partida actual será reemplazada.</h2><p id="restore-description"></p><p>Primero lee y descarga una copia de la partida actual. Después podrás escribir el archivo seleccionado.</p><button type="button" id="prepare-restore" class="button secondary">1. Crear respaldo previo</button><a id="pre-backup-link" class="button secondary" hidden>Descargar respaldo previo</a><label class="check"><input id="restore-consent" type="checkbox" disabled> Guardé el respaldo y quiero reemplazar la partida.</label><p id="restore-status" role="status"></p><div class="dialog-actions"><button value="cancel" id="dismiss-restore" class="button secondary">Volver</button><button type="button" id="confirm-restore" class="button primary" disabled>2. Restaurar y verificar</button></div></form></dialog>
+  <dialog id="engine-prompt"><h2 id="engine-prompt-title"></h2><p id="engine-prompt-text"></p><div class="dialog-actions"><button id="engine-prompt-cancel">Cancelar</button><button id="engine-prompt-ok">Continuar</button></div></dialog>
+  <dialog id="restore-dialog"><form method="dialog"><p class="eyebrow">RESTAURAR PARTIDA</p><h2 id="restore-heading">Tu partida actual será reemplazada.</h2><p id="restore-description"></p><p id="restore-instructions">Primero lee y descarga una copia de la partida actual. Después podrás escribir el archivo seleccionado.</p><button type="button" id="prepare-restore" class="button secondary">1. Crear respaldo previo</button><a id="pre-backup-link" class="button secondary" hidden>Descargar respaldo previo</a><label class="check"><input id="restore-consent" type="checkbox" disabled> Guardé el respaldo y quiero reemplazar la partida.</label><p id="restore-status" role="status"></p><div class="dialog-actions"><button value="cancel" id="dismiss-restore" class="button secondary">Volver</button><button type="button" id="confirm-restore" class="button primary" disabled>2. Restaurar y verificar</button></div></form></dialog>
 </body>
 </html>

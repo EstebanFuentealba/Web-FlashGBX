@@ -1,6 +1,7 @@
 import { requestTransport } from './lib/transport.js';
 import { LKDevice } from './lib/lk.js';
 import { CartridgeService, sizeLabel } from './lib/cartridge.js';
+import { renderLogo } from './lib/logo.js';
 import { createDemo } from './lib/demo.js';
 
 const $ = id => document.getElementById(id);
@@ -25,40 +26,45 @@ function message(text, error = false) {
 function updateControls() {
   const connected = !!service, locked = busy || $('restore-dialog').open;
   for (const id of ['reader-model','transport']) $(id).disabled = connected || locked;
-  for (const id of ['console','gba-size']) $(id).disabled = locked || demo;
+  for (const id of ['console','gba-size']) $(id).disabled = !connected || locked;
   $('connect').disabled = locked || demo;
   $('connect').textContent = connected && !demo ? 'Disconnect' : 'Connect';
   $('inspect').disabled = !connected || locked || !['DMG','AGB'].includes($('console').value);
   $('demo').disabled = connected || locked;
   $('exit-demo').disabled = busy;
   $('verify').disabled = locked;
-  const ready = connected && !!cart && !cart.unsupported && !locked;
-  $('backup-rom').disabled = !ready;
-  $('backup-save').disabled = !ready || !cart?.ramSize;
-  $('restore').disabled = !ready || !cart?.ramSize || demo;
+  const selected = connected && ['DMG','AGB'].includes($('console').value) && !locked;
+  for (const id of ['inspect','analyze','backup-rom','backup-save','write-rom','restore']) $(id).disabled = !selected;
   $('connection-badge').textContent = demo ? 'DEMOSTRACIÓN' : connected ? 'CONECTADO' : 'SIN CONEXIÓN';
   $('connection-badge').classList.toggle('connected', connected && !demo);
   $('device-led').classList.toggle('on', connected && !demo);
   $('demo-banner').hidden = !demo;
   $('power-notice').hidden = demo || !service || lk?.info?.powerControl !== false;
-  for (const radio of document.querySelectorAll('input[name=platform]')) { radio.disabled = locked || demo; radio.checked = radio.value === $('console').value; }
+  for (const radio of document.querySelectorAll('input[name=platform]')) { radio.disabled = !connected || locked; radio.checked = radio.value === $('console').value; }
   $('cartridge-title').textContent = `${$('console').value === 'AGB' ? 'Game Boy Advance' : 'Game Boy'} Cartridge Information`;
+  $('system-badge').hidden = !cart;
+  $('system-badge').textContent = cart?.system === 'Game Boy Color' ? 'CGB' : cart?.mode === 'AGB' ? 'AGB' : 'DMG';
   $('cart-empty').hidden = !!cart; $('cart-info').hidden = !cart;
   $('gba-size-field').hidden = $('console').value !== 'AGB';
   $('mode-hint').textContent = $('console').value === 'AGB' ? 'GBA · 3,3 V. Selecciona el tamaño de ROM; partidas GBA aún no disponibles.' : $('console').value === 'DMG' ? 'Game Boy / Color · 5 V. Partidas SRAM y MBC2; el respaldo no incluye RTC.' : 'Selecciona la plataforma antes de alimentar el cartucho.';
 }
 function showCart() {
-  for (const id of ['cart-name','rom-title','cart-code','cart-rtc','cart-logo','cart-checksum','cart-rom','cart-save','cart-mapper','rom-verification']) {
+  for (const id of ['cart-name','rom-title','cart-code','cart-rtc','cart-logo','cart-checksum','rom-checksum','cart-rom','cart-save','cart-mapper','rom-verification']) {
     $(id).textContent = '—'; $(id).classList.remove('valid');
   }
   if (cart) {
     $('rom-title').textContent = cart.title;
     const header = cart.header;
     $('cart-code').textContent = cart.code ? `AGB-${cart.code}-${header?.[0xbc] ?? '?'}` : '—';
+    if (header && cart.mode === 'DMG') {
+      $('rom-checksum').textContent = `0x${((header[0x14e] << 8) | header[0x14f]).toString(16).toUpperCase().padStart(4,'0')}`;
+      const code = new TextDecoder().decode(header.subarray(0x13f,0x143));
+      if ((header[0x143] & 0x80) && /^[A-Z][A-Z0-9]{3}$/.test(code)) $('cart-code').textContent = `DMG-${code}-${header[0x14c]}`;
+    }
     $('cart-rtc').textContent = cart.rtc ? 'Presente · lectura no disponible' : 'No disponible';
-    $('cart-logo').textContent = !demo && cart.mode === 'DMG' ? 'Valid' : 'No verificado';
-    $('cart-checksum').textContent = header ? `Valid (0x${header[cart.mode === 'AGB' ? 0xbd : 0x14d].toString(16).toUpperCase().padStart(2, '0')})` : 'Demo';
-    if (header) $('cart-checksum').classList.add('valid');
+    renderLogo($('cart-logo'), header, cart.mode);
+    $('cart-checksum').textContent = header && !demo ? `Valid (0x${header[cart.mode === 'AGB' ? 0xbd : 0x14d].toString(16).toUpperCase().padStart(2, '0')})` : 'Demo';
+    if (header && !demo) $('cart-checksum').classList.add('valid');
     $('cart-system').textContent = cart.system;
     $('cart-name').textContent = cart.title;
     $('cart-rom').textContent = sizeLabel(cart.romSize);
@@ -114,6 +120,7 @@ async function disconnect() {
   try { await lk?.close(); if (!lk) await transport?.close(); }
   finally {
     lk = null; transport = null; service = null; cart = null; demo = false;
+    $('console').value = '';
     $('device-name').textContent = 'GBFlash'; $('device-detail').textContent = 'USB OTG · Firmware L15';
     showCart();
   }
@@ -145,20 +152,37 @@ $('connect').addEventListener('click', () => run(service ? 'Desconectando' : 'Co
     $('device-name').textContent = info.name;
     $('device-detail').textContent = `L${info.version} · PCB ${info.pcb} · ${transport.label}`;
     log(`Identificado ${info.name}, firmware L${info.version}, PCB ${info.pcb}, ${$('reader-model').value} baud. Control de alimentación: ${info.powerControl ? 'sí' : 'no'}. Flags: 0x${info.flags.toString(16)}.`);
-    message('Lector conectado. Elige la consola e identifica el cartucho.');
+    message('Lector conectado. Elige Game Boy o Game Boy Advance para identificar el cartucho automáticamente.');
   } catch (error) { await disconnect(); throw error; }
 }));
-$('inspect').addEventListener('click', () => run('Identificando cartucho', async () => {
+async function identifyCartridge() {
   cart = null; showCart();
+  if (!service || !['DMG','AGB'].includes($('console').value)) throw new Error('Conecta el lector y selecciona una plataforma.');
   cart = await service.inspect($('console').value, Number($('gba-size').value)); showCart();
   if (cart.unsupported) message(cart.unsupported, true);
   else message(`${cart.title} identificado. ${demo ? 'Datos de demostración.' : 'Listo para respaldar.'}`);
-}));
-for (const id of ['console','gba-size']) $(id).addEventListener('change', () => { cart = null; showCart(); });
+}
+function inspectCartridge() { return run('Identificando cartucho', identifyCartridge); }
+function requireCartridge({save = false} = {}) {
+  if (!cart) throw new Error('No se pudo identificar el cartucho. Comprueba la inserción y pulsa Refresh.');
+  if (cart.unsupported) throw new Error(cart.unsupported);
+  if (save && (cart.mode !== 'DMG' || !cart.ramSize)) throw new Error(cart.mode === 'AGB' ? 'Las partidas GBA aún no están implementadas.' : 'Este cartucho no tiene memoria de partida compatible.');
+  return cart;
+}
+$('inspect').addEventListener('click', inspectCartridge);
+for (const id of ['console','gba-size']) $(id).addEventListener('change', inspectCartridge);
 for (const radio of document.querySelectorAll('input[name=platform]')) radio.addEventListener('change', () => {
-  $('console').value = radio.value; $('console').dispatchEvent(new Event('change'));
+  if (!service || busy) return;
+  $('console').value = radio.value; return inspectCartridge();
+});
+$('analyze').addEventListener('click', () => {
+  message('Analyze Flash Cart: la detección de chips flash y perfiles de programación aún no está implementada en este cliente. Refresh permite leer la cabecera del cartucho.');
+});
+$('write-rom').addEventListener('click', () => {
+  message('Write ROM: la programación de flashcarts aún no está implementada en este cliente. Usa FlashGBX de escritorio para esta operación.');
 });
 $('backup-rom').addEventListener('click', () => run('Respaldando ROM', async signal => {
+  requireCartridge();
   const data = await service.backupROM(cart, { signal, onProgress: (p, label) => progress(p, label, p * cart.romSize * ($('verify').checked ? 2 : 1)), verify: $('verify').checked });
   $('rom-verification').textContent = demo ? 'Demo' : $('verify').checked ? 'Two reads match' : 'Single read';
   $('rom-verification').classList.toggle('valid', !demo && $('verify').checked);
@@ -167,12 +191,19 @@ $('backup-rom').addEventListener('click', () => run('Respaldando ROM', async sig
   message('Respaldo preparado. Toca Descargar en «Tus respaldos» para guardarlo en el teléfono.');
 }, { transferWork: true }));
 $('backup-save').addEventListener('click', () => run('Respaldando partida', async signal => {
+  requireCartridge({save:true});
   const data = await service.backupSave(cart, { signal, onProgress: (p, label) => progress(p, label, p * cart.ramSize * 2) });
   await addDownload(data, `${demo ? 'DEMO_' : ''}${safeName(cart.title)}_${Date.now()}.sav`, demo ? 'Datos ficticios' : 'Dos lecturas coinciden · sin RTC');
   message('Partida verificada y preparada. Toca Descargar para conservar el archivo.');
 }, { transferWork: true }));
 $('cancel').addEventListener('click', () => { controller?.abort(); $('cancel').disabled = true; $('transfer-title').textContent = 'Terminando el bloque actual…'; });
-$('restore').addEventListener('click', () => { $('save-file').value = ''; $('save-file').click(); });
+$('restore').addEventListener('click', () => {
+  try {
+    requireCartridge({save:true});
+    if (demo) throw new Error('La demostración no escribe partidas en hardware.');
+    $('save-file').value = ''; $('save-file').click();
+  } catch (error) { message(error.message, true); }
+});
 $('save-file').addEventListener('change', () => run('Preparando restauración', async () => {
   const file = $('save-file').files[0]; if (!file) return;
   if (file.size !== cart.ramSize) throw new Error(`Tamaño incorrecto: el archivo tiene ${file.size} bytes y el cartucho necesita ${cart.ramSize}. No se escribió nada.`);
@@ -213,8 +244,8 @@ $('confirm-restore').addEventListener('click', async () => {
 $('demo').addEventListener('click', () => {
   document.querySelector('.options').open = false;
   const d = createDemo(); demo = true; service = d.service;
-  $('console').value = 'DMG'; $('device-name').textContent = d.info.name; $('device-detail').textContent = 'Simulación local · sin hardware';
-  message('Esta demostración genera archivos ficticios. Pulsa Refresh para explorar.'); updateControls();
+  $('console').value = ''; cart = null; showCart(); $('device-name').textContent = d.info.name; $('device-detail').textContent = 'Simulación local · sin hardware';
+  message('Esta demostración genera archivos ficticios. Selecciona Game Boy o Game Boy Advance para explorar.'); updateControls();
 });
 $('exit-demo').addEventListener('click', async () => { await disconnect(); message('Demostración cerrada. Puedes conectar tu lector.'); });
 document.addEventListener('click', event => {

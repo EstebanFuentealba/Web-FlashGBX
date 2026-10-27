@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0078d4"><meta name="description" content="Cliente web para GBFlash L15, con una interfaz basada en FlashGBX.">
+  <meta name="theme-color" content="#202020"><meta name="description" content="Cliente web para GBFlash L15, con una interfaz basada en FlashGBX.">
   <title>FlashGBX Pocket</title>
   <link rel="icon" href="./icon.svg"><link rel="manifest" href="./manifest.webmanifest"><link rel="stylesheet" href="./style.css">
   <script type="module" src="./app.js"></script>
@@ -15,29 +15,30 @@
     <div class="workspace">
       <fieldset class="cartridge-panel"><legend id="cartridge-title">Game Boy Cartridge Information</legend>
         <div class="info-grid">
-          <span>Game Name:</span><span id="cart-name">—</span>
+          <span>Game Name:</span><span class="name-field"><span id="cart-name">—</span><span id="system-badge" hidden></span></span>
           <span>ROM Title:</span><span id="rom-title">—</span>
           <span>Game Code and Revision:</span><span id="cart-code">—</span>
           <span>Real Time Clock:</span><span id="cart-rtc">—</span>
           <span>Boot Logo:</span><span id="cart-logo">—</span>
           <span>Header Checksum:</span><span id="cart-checksum">—</span>
-          <span>ROM Verification:</span><span id="rom-verification">—</span>
+          <span>ROM Checksum:</span><span id="rom-checksum" title="Checksum almacenado en la cabecera; se verifica al leer la ROM completa">—</span>
+          <span class="sr-only">ROM Verification:</span><span id="rom-verification" class="sr-only">—</span>
           <span>ROM Size:</span><div class="value-field"><span id="cart-rom">—</span><label id="gba-size-field" hidden><span class="sr-only">Tamaño de ROM GBA</span><select id="gba-size"><option value="1048576">1 MiB</option><option value="2097152">2 MiB</option><option value="4194304">4 MiB</option><option value="8388608">8 MiB</option><option value="16777216">16 MiB</option><option value="33554432" selected>32 MiB</option></select></label></div>
           <span>Save Type:</span><span id="cart-save" class="readout">—</span>
-          <span>Mapper:</span><span id="cart-mapper">—</span>
+          <span>Mapper Type:</span><span id="cart-mapper">—</span>
         </div>
         <div class="profile"><label for="cart-profile">Profile:</label><select id="cart-profile" disabled><option>Generic ROM Cartridge</option></select></div>
-        <p id="cart-empty" class="hint">Conecta el lector, elige la plataforma y pulsa Refresh.</p>
+        <p id="cart-empty" class="hint">Conecta el lector y elige la plataforma para leer el cartucho.</p>
         <div id="cart-info" hidden><span id="cart-system" class="sr-only"></span><p id="cart-note" class="hint"></p></div>
       </fieldset>
       <div class="right-column">
         <fieldset class="functions"><legend>Functions</legend>
-          <div class="platform"><span>Platform:</span><label><input type="radio" name="platform" value="DMG"> Game Boy</label><label><input type="radio" name="platform" value="AGB"> Game Boy Advance</label></div>
+          <div class="platform"><span>Platform:</span><label><input type="radio" name="platform" disabled value="DMG"> Game Boy</label><label><input type="radio" name="platform" disabled value="AGB"> Game Boy Advance</label></div>
           <select id="console" hidden aria-label="Plataforma"><option value="" selected>Selecciona plataforma</option><option value="DMG">Game Boy / Color · 5 V</option><option value="AGB">Game Boy Advance · 3,3 V</option></select>
           <div class="function-grid">
-            <button id="inspect" disabled>Refresh</button><button disabled title="El análisis de flashcarts aún no está implementado">Analyze Flash Cart</button>
+            <button id="inspect" disabled>Refresh</button><button id="analyze" disabled title="El análisis de flashcarts aún no está implementado">Analyze Flash Cart</button>
             <button id="backup-rom" disabled>Backup ROM</button><button id="backup-save" disabled>Backup Save Data</button>
-            <button disabled title="La programación de ROMs aún no está implementada">Write ROM</button><button id="restore" disabled>Write Save Data <span aria-hidden="true">▾</span></button>
+            <button id="write-rom" disabled title="La programación de ROMs aún no está implementada">Write ROM</button><button id="restore" disabled>Write Save Data <span aria-hidden="true">▾</span></button>
           </div>
           <p id="mode-hint" class="hint">Selecciona la plataforma antes de alimentar el cartucho.</p>
           <input type="file" id="save-file" accept=".sav,application/octet-stream" hidden>

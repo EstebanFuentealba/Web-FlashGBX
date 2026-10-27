@@ -11,3 +11,5 @@ La implementación JavaScript de este proyecto fue escrita para FlashGBX Pocket.
 - **Google Web Serial polyfill**: https://github.com/google/web-serial-polyfill. Consultado para establecer que implementa CDC ACM; no se distribuye ni se usa como controlador CH340.
 
 El ejemplo visual y los datos de demostración son originales y ficticios. No se distribuyen ROMs comerciales. Las constantes de logo de cabecera en las pruebas y el parser se usan para reconocer el formato GB.
+
+- Decodificación de logos GB/GBC y GBA: formatos y algoritmo de referencia en `RomFileDMG.py` y `RomFileAGB.py` de [FlashGBX](https://github.com/Lesserkuma/FlashGBX), GPL-3.0; Huffman GBA basado en la referencia de Winter1760 citada allí. Se renderizan los bytes del cartucho, sin una imagen de logo prefijada. Las pruebas incluyen los bytes estándar de cabecera GBA documentados en [ezgba](https://github.com/langest/ezgba/blob/master/src/tools/gba.py).

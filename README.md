@@ -1,6 +1,6 @@
 # FlashGBX Pocket
 
-Cliente web independiente del protocolo FlashGBX LK L15. La interfaz reproduce la distribución de FlashGBX de escritorio: información del cartucho, funciones, estado de transferencia y barra de conexión. Conserva los nombres de funciones en inglés y los mensajes y ayuda en español; se adapta a pantallas de 390 px y superiores. Las funciones aún no implementadas aparecen deshabilitadas. Aplicación estática, sin dependencias de ejecución, backend, cuentas propias, telemetría ni subida de ROMs/partidas. Los recursos, el controlador y los datos se procesan en el navegador; el alojamiento puede tener su propia autenticación.
+Cliente web independiente del protocolo FlashGBX LK L15. La interfaz reproduce la distribución de FlashGBX de escritorio: información del cartucho, funciones, estado de transferencia y barra de conexión. Conserva los nombres de funciones en inglés y los mensajes y ayuda en español; se adapta a pantallas de 390 px y superiores. Connect habilita los radios de plataforma; elegir uno lee automáticamente la cabecera y habilita los seis botones. Analyze Flash Cart y Write ROM muestran su limitación al pulsarlos, porque aún no están implementados. Las operaciones sin memoria de partida compatible también se explican al pulsarlas. El logo se decodifica desde la cabecera GB/GBC o GBA. Aplicación estática, sin dependencias de ejecución, backend, cuentas propias, telemetría ni subida de ROMs/partidas. Los recursos, el controlador y los datos se procesan en el navegador; el alojamiento puede tener su propia autenticación.
 
 ## Dispositivo objetivo
 
@@ -35,8 +35,8 @@ Los archivos MBC2 tienen 512 bytes con el nibble alto normalizado a `F`. Un `.sa
 2. Inserta el cartucho con el lector desconectado.
 3. Abre la URL HTTPS de la aplicación directamente en Chrome. Si el alojamiento es privado, inicia sesión con la cuenta propietaria.
 4. Conecta el lector mediante OTG y toca **Conectar por USB**. El perfil predeterminado es GBFlash a 2 Mbaud.
-5. Selecciona GB/GBC o GBA. La selección controla el voltaje, así que debe coincidir con el cartucho. Las revisiones sin control de alimentación muestran un aviso permanente: desconecta físicamente el USB antes de retirar o cambiar el cartucho; cerrar la conexión desde la app no corta la alimentación.
-6. Toca **Identificar cartucho**, realiza el respaldo y toca **Descargar** para conservar el archivo.
+5. Selecciona GB/GBC o GBA para identificar automáticamente el cartucho. La selección controla el voltaje, así que debe coincidir con el cartucho. Las revisiones sin control de alimentación muestran un aviso permanente: desconecta físicamente el USB antes de retirar o cambiar el cartucho; cerrar la conexión desde la app no corta la alimentación.
+6. Usa **Refresh** si necesitas releer el cartucho, realiza el respaldo y toca **Descargar** para conservar el archivo.
 7. Para restaurar una partida GB/GBC, selecciona un `.sav`. La app requiere leer y descargar un respaldo previo antes de habilitar la escritura. Conserva Chrome en primer plano y el cable conectado hasta terminar.
 8. Desconecta el lector antes de retirar o cambiar el cartucho.
 

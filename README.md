@@ -4,6 +4,8 @@ Cliente web para GBFlash/GBxCart RW con firmware LK L15. Ejecuta el motor origin
 
 Los recursos de Python, sus dependencias, el código fuente de FlashGBX, las bases de datos y los perfiles se sirven con la aplicación. Las ROMs, partidas y fotos se procesan en memoria local y no se envían a un servicio externo. El espacio de trabajo se pierde al recargar: descarga los archivos que quieras conservar.
 
+https://estebanfuentealba.github.io/Web-FlashGBX/
+
 ## Funciones
 
 | Función | Implementación |

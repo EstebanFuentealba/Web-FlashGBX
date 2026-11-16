@@ -3,7 +3,11 @@
   "version": "5.1",
   "source": "https://github.com/Lesserkuma/FlashGBX",
   "snapshot": "Lesserkuma-FlashGBX-e4467d7",
-  "sha256": "11d66ea5516c603eb6085790fdcc22ba2fce13003b9bd097d57806fbd149039b",
+  "sha256": "c80fcbfdce631181e0b8369874821882cf0bfd1fd3a5f18202f7f7788c4ac25a",
   "pyodide": "314.0.7",
-  "commit": "e4467d79635d868f780d099112e55c65118dec58"
+  "commit": "e4467d79635d868f780d099112e55c65118dec58",
+  "localDatabaseAdditions": {
+    "db_DMG.json": 5,
+    "db_AGB.json": 1
+  }
 }

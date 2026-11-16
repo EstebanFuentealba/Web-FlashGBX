@@ -72,6 +72,12 @@ adb reverse tcp:4173 tcp:4173
 
 Abre `http://localhost:4173` en Chrome del teléfono. HTTP sobre una IP de LAN no habilita WebUSB.
 
+## GitHub Pages
+
+En el repositorio de GitHub, abre **Settings → Pages** y elige **GitHub Actions** como origen. El workflow `.github/workflows/pages.yml` ejecuta las pruebas y publica `dist/` al hacer push a `main`. También puedes iniciarlo manualmente desde **Actions → Deploy to GitHub Pages** en `main`.
+
+Abre la URL HTTPS que muestra el despliegue directamente en Chrome. En la primera visita, la página se recarga al activarse el service worker que añade los encabezados de aislamiento requeridos por el motor WebAssembly.
+
 ## Cloudflare
 
 `wrangler.jsonc` publica `dist/` como Worker Static Assets. No hay un backend Python.
